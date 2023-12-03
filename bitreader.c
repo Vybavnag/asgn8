@@ -1,6 +1,6 @@
 #include "bitreader.h"
-#include <stdio.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 struct BitReader {
     FILE *underlying_stream;
@@ -8,14 +8,13 @@ struct BitReader {
     uint8_t bit_position;
 };
 
+
 BitReader *bit_read_open(const char *filename) {
-    BitReader *reader = malloc(sizeof(BitReader));
-    if (reader == NULL) {
-        return NULL;
-    }
+    BitReader *reader = (BitReader *)malloc(sizeof(BitReader));
+    if (!reader) return NULL;
 
     FILE *f = fopen(filename, "rb");
-    if (f == NULL) {
+    if (!f) {
         free(reader);
         return NULL;
     }
@@ -23,12 +22,11 @@ BitReader *bit_read_open(const char *filename) {
     reader->underlying_stream = f;
     reader->byte = 0;
     reader->bit_position = 8;
-
     return reader;
 }
 
 void bit_read_close(BitReader **pbuf) {
-    if (pbuf != NULL && *pbuf != NULL) {
+    if (pbuf && *pbuf) {
         fclose((*pbuf)->underlying_stream);
         free(*pbuf);
         *pbuf = NULL;
@@ -37,12 +35,12 @@ void bit_read_close(BitReader **pbuf) {
 
 uint8_t bit_read_bit(BitReader *buf) {
     if (buf->bit_position > 7) {
-        int next_byte = fgetc(buf->underlying_stream);
-        if (next_byte == EOF) {
-            // Handle EOF or error
-            return 0; // Placeholder error handling
+        int c = fgetc(buf->underlying_stream);
+        if (c == EOF) {
+            return 0; 
         }
-        buf->byte = (uint8_t) next_byte;
+
+        buf->byte = (uint8_t)c;
         buf->bit_position = 0;
     }
 
@@ -50,6 +48,7 @@ uint8_t bit_read_bit(BitReader *buf) {
     buf->bit_position++;
     return bit;
 }
+
 
 uint8_t bit_read_uint8(BitReader *buf) {
     uint8_t byte = 0;
@@ -63,17 +62,18 @@ uint8_t bit_read_uint8(BitReader *buf) {
 uint16_t bit_read_uint16(BitReader *buf) {
     uint16_t word = 0;
     for (int i = 0; i < 16; i++) {
-        uint8_t bit = bit_read_bit(buf);
-        word |= ((uint16_t)bit << i);
+        uint16_t bit = bit_read_bit(buf);
+        word |= (bit << i);
     }
     return word;
 }
 
+
 uint32_t bit_read_uint32(BitReader *buf) {
-    uint32_t dword = 0;
+    uint32_t word = 0;
     for (int i = 0; i < 32; i++) {
-        uint8_t bit = bit_read_bit(buf);
-        dword |= ((uint32_t)bit << i);
+        uint32_t bit = bit_read_bit(buf);
+        word |= (bit << i);
     }
-    return dword;
+    return word;
 }

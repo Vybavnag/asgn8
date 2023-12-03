@@ -1,6 +1,6 @@
 #include "bitwriter.h"
-#include <stdio.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 struct BitWriter {
     FILE *underlying_stream;
@@ -9,10 +9,8 @@ struct BitWriter {
 };
 
 BitWriter *bit_write_open(const char *filename) {
-    BitWriter *writer = malloc(sizeof(BitWriter));
-    if (!writer) {
-        return NULL;
-    }
+    BitWriter *writer = (BitWriter *)malloc(sizeof(BitWriter));
+    if (!writer) return NULL;
 
     FILE *f = fopen(filename, "wb");
     if (!f) {
@@ -23,7 +21,6 @@ BitWriter *bit_write_open(const char *filename) {
     writer->underlying_stream = f;
     writer->byte = 0;
     writer->bit_position = 0;
-
     return writer;
 }
 
@@ -38,17 +35,14 @@ void bit_write_close(BitWriter **pbuf) {
     }
 }
 
-void bit_write_bit(BitWriter *buf, uint8_t bit) {
+void bit_write_bit(BitWriter *buf, uint8_t x) {
     if (buf->bit_position > 7) {
         fputc(buf->byte, buf->underlying_stream);
         buf->byte = 0;
         buf->bit_position = 0;
     }
-
-    if (bit) {
-        buf->byte |= (1 << buf->bit_position);
-    }
-    buf->bit_position++;
+    buf->byte |= (x << buf->bit_position);
+    buf->bit_position += 1;
 }
 
 void bit_write_uint8(BitWriter *buf, uint8_t x) {

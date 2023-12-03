@@ -2,8 +2,7 @@
 #include "node.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdint.h>
-#include <unistd.h>
+#include <string.h>
 #include <assert.h>
 
 void dehuff_decompress_file(FILE *fout, BitReader *inbuf) {
@@ -15,76 +14,86 @@ void dehuff_decompress_file(FILE *fout, BitReader *inbuf) {
     assert(type1 == 'H');
     assert(type2 == 'C');
 
-    uint16_t num_nodes = 2 * num_leaves - 1;
-    Node *node, *stack[num_nodes];
-    int stack_top = -1;
+    int num_nodes = 2 * num_leaves - 1;
+    Node *nodes[num_nodes];
+    int node_count = 0;
 
     for (int i = 0; i < num_nodes; i++) {
         uint8_t bit = bit_read_bit(inbuf);
+        Node *node;
         if (bit == 1) {
             uint8_t symbol = bit_read_uint8(inbuf);
             node = node_create(symbol, 0);
         } else {
             node = node_create(0, 0);
-            node->right = stack[stack_top--];
-            node->left = stack[stack_top--];
+            node->right = nodes[--node_count];
+            node->left = nodes[--node_count];
         }
-        stack[++stack_top] = node;
+        nodes[node_count++] = node;
     }
 
-    Node *code_tree = stack[stack_top--];
-
-    for (int i = 0; i < filesize; i++) {
-        node = code_tree;
+    Node *code_tree = nodes[0];
+    for (uint32_t i = 0; i < filesize; i++) { // Corrected loop variable type to uint32_t
+        Node *node = code_tree;
         while (node->left != NULL || node->right != NULL) {
             uint8_t bit = bit_read_bit(inbuf);
             node = (bit == 0) ? node->left : node->right;
         }
         fputc(node->symbol, fout);
     }
+
+    // Free memory
+    for (int i = 0; i < node_count; i++) {
+        node_free(&nodes[i]);
+    }
+}
+
+void print_help(void) { // Corrected function prototype
+    printf("Huffman Coding Decompression\n");
+    printf("Usage: dehuff [-i inputfile] [-o outputfile] [-h]\n");
+    printf("  -i : Sets the name of the input file. Requires a filename as an argument.\n");
+    printf("  -o : Sets the name of the output file. Requires a filename as an argument.\n");
+    printf("  -h : Prints this help message.\n");
 }
 
 int main(int argc, char *argv[]) {
-    char *inputFileName = NULL;
-    char *outputFileName = NULL;
+    char *input_filename = NULL;
+    char *output_filename = NULL;
 
-    int opt;
-    while ((opt = getopt(argc, argv, "i:o:h")) != -1) {
-        switch (opt) {
-            case 'i':
-                inputFileName = optarg;
-                break;
-            case 'o':
-                outputFileName = optarg;
-                break;
-            case 'h':
-                printf("Usage: %s -i inputfile -o outputfile\n", argv[0]);
-                return 0;
-            default:
-                fprintf(stderr, "Usage: %s -i inputfile -o outputfile\n", argv[0]);
-                exit(EXIT_FAILURE);
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "-i") == 0 && i + 1 < argc) {
+            input_filename = argv[++i];
+        } else if (strcmp(argv[i], "-o") == 0 && i + 1 < argc) {
+            output_filename = argv[++i];
+        } else if (strcmp(argv[i], "-h") == 0) {
+            print_help();
+            return 0;
         }
     }
 
-    if (!inputFileName || !outputFileName) {
-        fprintf(stderr, "Both input and output files must be specified\n");
-        exit(EXIT_FAILURE);
+    if (!input_filename || !output_filename) {
+        fprintf(stderr, "Input and output filenames are required.\n");
+        print_help();
+        return 1;
     }
 
-    FILE *inputFile = fopen(inputFileName, "rb");
-    FILE *outputFile = fopen(outputFileName, "wb");
-
-    if (!inputFile || !outputFile) {
-        fprintf(stderr, "Error opening files\n");
-        exit(EXIT_FAILURE);
+    BitReader *inbuf = bit_read_open(input_filename);
+    if (!inbuf) {
+        perror("Failed to open input file");
+        return 1;
     }
 
-    BitReader *inbuf = bit_read_open(inputFileName);
-    dehuff_decompress_file(outputFile, inbuf);
+    FILE *fout = fopen(output_filename, "wb");
+    if (!fout) {
+        perror("Failed to open output file");
+        bit_read_close(&inbuf);
+        return 1;
+    }
 
-    fclose(inputFile);
-    fclose(outputFile);
+    dehuff_decompress_file(fout, inbuf);
+
     bit_read_close(&inbuf);
+    fclose(fout);
 
     return 0;
 }
