@@ -33,7 +33,7 @@ Node *create_tree(uint32_t *histogram, uint16_t *num_leaves) {
             (*num_leaves)++;
         }
     }
-    
+
     while (!pq_size_is_1(pq)) {
         Node *left = dequeue(pq);
         Node *right = dequeue(pq);
@@ -43,7 +43,9 @@ Node *create_tree(uint32_t *histogram, uint16_t *num_leaves) {
         enqueue(pq, parent);
     }
 
-    return dequeue(pq);
+    Node *root = dequeue(pq);
+    pq_free(&pq); 
+    return root;
 }
 
 void fill_code_table(Code *code_table, Node *node, uint64_t code, uint8_t code_length) {
@@ -62,9 +64,9 @@ void huff_write_tree(BitWriter *outbuf, Node *node) {
         bit_write_bit(outbuf, 1);
         bit_write_uint8(outbuf, node->symbol);
     } else {
+        bit_write_bit(outbuf, 0);
         huff_write_tree(outbuf, node->left);
         huff_write_tree(outbuf, node->right);
-        bit_write_bit(outbuf, 0);
     }
 }
 
@@ -86,7 +88,7 @@ void huff_compress_file(BitWriter *outbuf, FILE *fin, uint32_t filesize, uint16_
     }
 }
 
-void print_help(void) {  // Added 'void' to indicate no arguments
+void print_help(void) {
     printf("Huffman Coding Compression\n");
     printf("Usage: huff [-i inputfile] [-o outputfile] [-h]\n");
     printf("  -i : Sets the name of the input file. Requires a filename as an argument.\n");
@@ -135,13 +137,15 @@ int main(int argc, char *argv[]) {
     Node *code_tree = create_tree(histogram, &num_leaves);
 
     Code code_table[256];
+    memset(code_table, 0, sizeof(code_table));
     fill_code_table(code_table, code_tree, 0, 0);
 
     huff_compress_file(outbuf, fin, filesize, num_leaves, code_tree, code_table);
 
     bit_write_close(&outbuf);
     fclose(fin);
-    node_free(&code_tree);
+
+    node_free(&code_tree); 
 
     return 0;
 }
